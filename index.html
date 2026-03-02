@@ -72,19 +72,19 @@ async function extractText(){
 }
 
 function play(){
-  if(!extractedText || extractedText.length < 1){
-    alert("Extract text first (tap Extract).");
+  let text = document.getElementById("textBox").value;
+
+  if(!text || text.length < 1){
+    alert("Write or extract text first.");
     return;
   }
-  let msg = new SpeechSynthesisUtterance(extractedText);
+
   speechSynthesis.cancel();
+
+  let msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "es-ES";
+  msg.rate = 1;
+  msg.pitch = 1;
+
   speechSynthesis.speak(msg);
 }
-
-function stop(){
-  speechSynthesis.cancel();
-}
-</script>
-
-</body>
-</html>

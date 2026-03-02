@@ -1,45 +1,197 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDF Voice Reader</title>
-<style>
-body { font-family: Arial; padding: 20px; }
-button { padding: 10px; margin: 5px; }
-textarea { width: 100%; height: 200px; }
-</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <title>PDF Voice Reader</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 16px; }
+    h2 { margin: 0 0 10px; }
+    button, select, input { padding: 10px; margin: 6px 6px 6px 0; font-size: 16px; }
+    textarea { width: 100%; height: 240px; padding: 10px; font-size: 14px; }
+    #status { margin: 10px 0; font-size: 14px; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .small { font-size: 12px; opacity: 0.75; margin-top: 6px; }
+  </style>
+
+  <!-- pdf.js for extracting text from PDFs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 </head>
 <body>
 
-<h2>PDF Voice Reader Test</h2>
+  <h2>PDF Voice Reader</h2>
 
-<textarea id="textBox">Hola esto es una prueba</textarea>
-<br>
-<button id="speakBtn">Play</button>
-<button id="stopBtn">Stop</button>
+  <div class="row">
+    <input type="file" id="pdfFile" accept="application/pdf">
+    <button id="extractBtn">Extract</button>
+  </div>
+
+  <div class="row">
+    <label>Language:
+      <select id="langSelect">
+        <option value="auto" selected>Auto</option>
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+
+    <label>Voice:
+      <select id="voiceSelect"></select>
+    </label>
+
+    <label>Rate:
+      <input id="rate" type="number" step="0.1" min="0.5" max="2" value="1">
+    </label>
+  </div>
+
+  <div class="row">
+    <button id="playBtn">Play</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="resumeBtn">Resume</button>
+    <button id="stopBtn">Stop</button>
+  </div>
+
+  <div id="status">Status: choose a PDF and tap Extract</div>
+
+  <textarea id="textBox" placeholder="Extracted text will appear here..."></textarea>
+  <div class="small">Tip: If extraction returns empty, your PDF may be scanned images or protected.</div>
 
 <script>
-document.getElementById("speakBtn").addEventListener("click", function() {
-    let text = document.getElementById("textBox").value;
+  // pdf.js worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
 
+  const pdfFile = document.getElementById("pdfFile");
+  const extractBtn = document.getElementById("extractBtn");
+  const playBtn = document.getElementById("playBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resumeBtn = document.getElementById("resumeBtn");
+  const stopBtn = document.getElementById("stopBtn");
+
+  const statusEl = document.getElementById("status");
+  const textBox = document.getElementById("textBox");
+  const voiceSelect = document.getElementById("voiceSelect");
+  const langSelect = document.getElementById("langSelect");
+  const rateEl = document.getElementById("rate");
+
+  let speaking = false;
+
+  // --- Load system voices ---
+  function loadVoices() {
+    const voices = speechSynthesis.getVoices();
+    voiceSelect.innerHTML = "";
+    voices.forEach((v, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})${v.default ? " — default" : ""}`;
+      voiceSelect.appendChild(opt);
+    });
+
+    // Auto-pick a Spanish voice if available, otherwise default
+    const esIndex = voices.findIndex(v => (v.lang || "").toLowerCase().startsWith("es"));
+    if (esIndex >= 0) voiceSelect.value = String(esIndex);
+  }
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+
+  function stopSpeech() {
+    speechSynthesis.cancel();
+    speaking = false;
+    statusEl.textContent = "Status: stopped";
+  }
+
+  async function extractTextFromPDF(file) {
+    statusEl.textContent = "Status: loading PDF…";
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+
+    let fullText = "";
+    for (let p = 1; p <= pdf.numPages; p++) {
+      statusEl.textContent = `Status: extracting page ${p}/${pdf.numPages}…`;
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const strings = content.items.map(it => it.str);
+      fullText += strings.join(" ") + "\n\n";
+    }
+    return fullText.trim();
+  }
+
+  extractBtn.addEventListener("click", async () => {
+    const file = pdfFile.files?.[0];
+    if (!file) {
+      alert("Choose a PDF first.");
+      return;
+    }
+    try {
+      stopSpeech();
+      const text = await extractTextFromPDF(file);
+      textBox.value = text;
+
+      if (!text || text.length < 20) {
+        statusEl.textContent = "Status: extracted text is empty (scanned/protected PDF?)";
+        alert("No text extracted. This PDF may be scanned images or protected.");
+      } else {
+        statusEl.textContent = `Status: extracted ✅ (${text.length.toLocaleString()} chars)`;
+      }
+    } catch (e) {
+      console.log(e);
+      statusEl.textContent = "Status: extraction failed (scanned/protected PDF?)";
+      alert("Extraction failed. This PDF may be protected or scanned.");
+    }
+  });
+
+  playBtn.addEventListener("click", () => {
+    const text = textBox.value.trim();
     if (!text) {
-        alert("No text found.");
-        return;
+      alert("Extract a PDF first (tap Extract), or paste text into the box.");
+      return;
     }
 
-    speechSynthesis.cancel();
+    stopSpeech();
 
-    let utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "es-ES";
-    utterance.rate = 1;
-    utterance.pitch = 1;
+    const voices = speechSynthesis.getVoices();
+    const voice = voices[Number(voiceSelect.value)] || null;
 
-    speechSynthesis.speak(utterance);
-});
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = voice;
 
-document.getElementById("stopBtn").addEventListener("click", function() {
-    speechSynthesis.cancel();
-});
+    const langMode = langSelect.value;
+    if (langMode === "es") u.lang = "es-ES";
+    if (langMode === "en") u.lang = "en-US";
+    // "auto" just uses the selected voice's language
+
+    u.rate = Number(rateEl.value) || 1;
+    u.pitch = 1;
+
+    u.onstart = () => {
+      speaking = true;
+      statusEl.textContent = "Status: speaking…";
+    };
+    u.onend = () => {
+      speaking = false;
+      statusEl.textContent = "Status: finished";
+    };
+    u.onerror = () => {
+      speaking = false;
+      statusEl.textContent = "Status: speech error (try another voice)";
+    };
+
+    speechSynthesis.speak(u);
+  });
+
+  pauseBtn.addEventListener("click", () => {
+    if (!speaking) return;
+    speechSynthesis.pause();
+    statusEl.textContent = "Status: paused";
+  });
+
+  resumeBtn.addEventListener("click", () => {
+    if (!speaking) return;
+    speechSynthesis.resume();
+    statusEl.textContent = "Status: speaking…";
+  });
+
+  stopBtn.addEventListener("click", stopSpeech);
 </script>
 
 </body>

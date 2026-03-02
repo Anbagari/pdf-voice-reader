@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Voice Reader</title>
+<style>
+body{font-family:Arial;padding:20px}
+button{padding:10px;margin:5px}
+textarea{width:100%;height:200px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
+</head>
+<body>
+
+<h2>PDF Voice Reader</h2>
+
+<input type="file" id="pdfFile" accept="application/pdf">
+<button onclick="extractText()">Extract</button>
+<button onclick="play()">Play</button>
+<button onclick="stop()">Stop</button>
+
+<textarea id="textBox"></textarea>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+
+let extractedText = "";
+
+async function extractText(){
+let file = document.getElementById("pdfFile").files[0];
+if(!file)return;
+let buffer = await file.arrayBuffer();
+let pdf = await pdfjsLib.getDocument({data:buffer}).promise;
+let fullText="";
+for(let i=1;i<=pdf.numPages;i++){
+let page=await pdf.getPage(i);
+let content=await page.getTextContent();
+let strings=content.items.map(item=>item.str);
+fullText+=strings.join(" ")+"\n\n";
+}
+extractedText=fullText;
+document.getElement

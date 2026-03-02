@@ -6,7 +6,8 @@
 <style>
 body{font-family:Arial;padding:20px}
 button{padding:10px;margin:5px}
-textarea{width:100%;height:200px}
+textarea{width:100%;height:220px}
+#status{margin:10px 0; font-size:14px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 </head>
@@ -19,7 +20,9 @@ textarea{width:100%;height:200px}
 <button onclick="play()">Play</button>
 <button onclick="stop()">Stop</button>
 
-<textarea id="textBox"></textarea>
+<div id="status">Status: waiting for PDF</div>
+
+<textarea id="textBox" placeholder="Extracted text will appear here..."></textarea>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -28,16 +31,60 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 let extractedText = "";
 
 async function extractText(){
-let file = document.getElementById("pdfFile").files[0];
-if(!file)return;
-let buffer = await file.arrayBuffer();
-let pdf = await pdfjsLib.getDocument({data:buffer}).promise;
-let fullText="";
-for(let i=1;i<=pdf.numPages;i++){
-let page=await pdf.getPage(i);
-let content=await page.getTextContent();
-let strings=content.items.map(item=>item.str);
-fullText+=strings.join(" ")+"\n\n";
+  try{
+    const status = document.getElementById("status");
+    let file = document.getElementById("pdfFile").files[0];
+
+    if(!file){
+      status.innerText = "Status: Please choose a PDF first.";
+      alert("Choose a PDF first.");
+      return;
+    }
+
+    status.innerText = "Status: Loading PDF…";
+    let buffer = await file.arrayBuffer();
+
+    let pdf = await pdfjsLib.getDocument({data:buffer}).promise;
+
+    let fullText="";
+    for(let i=1;i<=pdf.numPages;i++){
+      status.innerText = `Status: Extracting page ${i} / ${pdf.numPages}…`;
+      let page = await pdf.getPage(i);
+      let content = await page.getTextContent();
+      let strings = content.items.map(item => item.str);
+      fullText += strings.join(" ") + "\n\n";
+    }
+
+    extractedText = fullText.trim();
+    document.getElementById("textBox").value = extractedText;
+
+    if(extractedText.length < 20){
+      status.innerText = "Status: Extracted text is empty. (This PDF may be scanned images or protected.)";
+      alert("No text extracted. The PDF may be scanned (images) or protected.");
+    } else {
+      status.innerText = `Status: Done ✅ (${extractedText.length} characters)`;
+    }
+  }catch(e){
+    console.log(e);
+    document.getElementById("status").innerText = "Status: Extraction failed. PDF may be protected/scanned.";
+    alert("Extraction failed. The PDF may be protected/scanned. Try another PDF.");
+  }
 }
-extractedText=fullText;
-document.getElement
+
+function play(){
+  if(!extractedText || extractedText.length < 1){
+    alert("Extract text first (tap Extract).");
+    return;
+  }
+  let msg = new SpeechSynthesisUtterance(extractedText);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(msg);
+}
+
+function stop(){
+  speechSynthesis.cancel();
+}
+</script>
+
+</body>
+</html>

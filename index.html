@@ -17,7 +17,13 @@
   <!-- pdf.js for extracting text from PDFs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 </head>
-<body>
+<script>
+setTimeout(() => {
+  let voices = speechSynthesis.getVoices();
+  alert("Voices loaded: " + voices.length);
+}, 1000);
+</script>
+  <body>
 
   <h2>PDF Voice Reader</h2>
 

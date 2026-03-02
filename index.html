@@ -4,87 +4,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PDF Voice Reader</title>
 <style>
-body{font-family:Arial;padding:20px}
-button{padding:10px;margin:5px}
-textarea{width:100%;height:220px}
-#status{margin:10px 0; font-size:14px;}
+body { font-family: Arial; padding: 20px; }
+button { padding: 10px; margin: 5px; }
+textarea { width: 100%; height: 200px; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 </head>
 <body>
 
-<h2>PDF Voice Reader</h2>
+<h2>PDF Voice Reader Test</h2>
 
-<input type="file" id="pdfFile" accept="application/pdf">
-<button onclick="extractText()">Extract</button>
-<button onclick="play()">Play</button>
-<button onclick="stop()">Stop</button>
-
-<div id="status">Status: waiting for PDF</div>
-
-<textarea id="textBox" placeholder="Extracted text will appear here..."></textarea>
+<textarea id="textBox">Hola esto es una prueba</textarea>
+<br>
+<button id="speakBtn">Play</button>
+<button id="stopBtn">Stop</button>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+document.getElementById("speakBtn").addEventListener("click", function() {
+    let text = document.getElementById("textBox").value;
 
-let extractedText = "";
-
-async function extractText(){
-  try{
-    const status = document.getElementById("status");
-    let file = document.getElementById("pdfFile").files[0];
-
-    if(!file){
-      status.innerText = "Status: Please choose a PDF first.";
-      alert("Choose a PDF first.");
-      return;
+    if (!text) {
+        alert("No text found.");
+        return;
     }
 
-    status.innerText = "Status: Loading PDF…";
-    let buffer = await file.arrayBuffer();
+    speechSynthesis.cancel();
 
-    let pdf = await pdfjsLib.getDocument({data:buffer}).promise;
+    let utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "es-ES";
+    utterance.rate = 1;
+    utterance.pitch = 1;
 
-    let fullText="";
-    for(let i=1;i<=pdf.numPages;i++){
-      status.innerText = `Status: Extracting page ${i} / ${pdf.numPages}…`;
-      let page = await pdf.getPage(i);
-      let content = await page.getTextContent();
-      let strings = content.items.map(item => item.str);
-      fullText += strings.join(" ") + "\n\n";
-    }
+    speechSynthesis.speak(utterance);
+});
 
-    extractedText = fullText.trim();
-    document.getElementById("textBox").value = extractedText;
+document.getElementById("stopBtn").addEventListener("click", function() {
+    speechSynthesis.cancel();
+});
+</script>
 
-    if(extractedText.length < 20){
-      status.innerText = "Status: Extracted text is empty. (This PDF may be scanned images or protected.)";
-      alert("No text extracted. The PDF may be scanned (images) or protected.");
-    } else {
-      status.innerText = `Status: Done ✅ (${extractedText.length} characters)`;
-    }
-  }catch(e){
-    console.log(e);
-    document.getElementById("status").innerText = "Status: Extraction failed. PDF may be protected/scanned.";
-    alert("Extraction failed. The PDF may be protected/scanned. Try another PDF.");
-  }
-}
-
-function play(){
-  let text = document.getElementById("textBox").value;
-
-  if(!text || text.length < 1){
-    alert("Write or extract text first.");
-    return;
-  }
-
-  speechSynthesis.cancel();
-
-  let msg = new SpeechSynthesisUtterance(text);
-  msg.lang = "es-ES";
-  msg.rate = 1;
-  msg.pitch = 1;
-
-  speechSynthesis.speak(msg);
-}
+</body>
+</html>
